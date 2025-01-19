@@ -2,43 +2,41 @@
 import { graphql } from '@octokit/graphql'
 import type { GraphQlQueryResponseData } from '@octokit/graphql'
 import { fetchProductEOL } from './endoflife.ts'
+import { createIssue, fetchAllIssues } from './github.ts'
 
 const repository_id = ''
 
+const updateEolIssuesByProduct = async (product: string) => {
+  const eol_res = await fetchProductEOL(product)
+  if (!eol_res.ok) {
+    console.error(eol_res.error)
+    return
+  }
+
+  const eolInfos = eol_res.value
+  if (eolInfos.length === 0) {
+    console.log(`No EOL information found for ${product}`)
+    return
+  }
+  console.log(eolInfos)
+
+  const issues_res = await fetchAllIssues(
+    'homura10059',
+    'eol-issues-sample',
+    product
+  )
+  if (!issues_res.ok) {
+    console.error(issues_res.error)
+    return
+  }
+
+  const issues = issues_res.value
+  console.log(issues)
+}
+
 const main = async () => {
   const products = ['nodejs']
-  // https://endoflife.date/api/{product}.json を引いてデータとってくる
-  const results = await Promise.all(
-    products.map(product => fetchProductEOL(product))
-  )
-  const flatResults = results
-    .filter(result => result.ok)
-    .flatMap(result => result.value)
-  console.log(flatResults)
-
-  const graphqlWithAuth = graphql.defaults({
-    headers: {
-      authorization: `token ${process.env.GITHUB_TOKEN}`
-    }
-  })
-
-  // TODO: eol情報の取得
-  // TODO: repositoryのissueを取得
-  const { repository }: GraphQlQueryResponseData = await graphqlWithAuth(
-    `{
-    repository(owner: "homura10059", name: "eol-issues-sample") {
-      issues(last: 3) {
-        edges {
-          node {
-            title
-          }
-        }
-      }
-    }
-  }`
-  )
-
-  console.log(repository)
+  const results = await Promise.all(products.map(updateEolIssuesByProduct))
 }
 
 main()
